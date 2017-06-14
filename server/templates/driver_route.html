@@ -3,126 +3,166 @@
 <head>
     <meta charset="utf-8">
     <title>司机轨迹可视化</title>
-    <!-- 引入 echarts.js -->
-    <script src="../static/js/echarts.js"></script>
+    <!-- 引入 echarts.min.js -->
+    <script src="../static/js/echarts.min.js"></script>
+    <!--<script src="../static/js/bmap.js"></script>-->
+    <!--<script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=53oVIOgmSIejwV7EfphPgTynOZbIiVYu"></script>-->
     <script src="https://code.jquery.com/jquery-3.2.0.min.js"></script>
 
 </head>
 <body>
-    <!-- 为ECharts准备一个具备大小（宽高）的Dom -->
-    <div class="header">
-        <h2>司机轨迹可视化</h2>
-            司机ID <input type="text" class="driver_id" name="driver_id">
-            日期   <input type="text" class="date" name="date" placeholder="例如:20170315">
-            <input type="submit" class="submit" value="确定">
-    </div>
-    <div id="main" style="width: 600px;height:400px;"></div>
-    <script type="text/javascript">
-        var submit = $('.submit');
-        var pick_route;
-        var charge_route;
-        submit.on('click', function() {
-            var driver_id = $('.driver_id').val();
-            var date = $('.date').val();
+<!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+<div class="header">
+    <h2>司机轨迹可视化</h2>
+    司机ID <input type="text" class="driver_id" name="driver_id"><br>
+    日期   <input type="text" class="date" name="date" placeholder="例如:20170315">
+    <input type="submit" class="submit-day" value="查询一天轨迹">
+    起始日期 <input type="text" class="start_date" name="start_date" placeholder="例如:20170315">
+    结束日期 <input type="text" class="end_date" name="end_date" placeholder="例如:20170315">
+    <input type="submit" class="submit-week" value="查询一周轨迹">
+</div>
+<div id="main" style="width: 2000px;height:2000px;"></div>
+<script type="text/javascript">
+    var submit = $('.submit');
+    var receive_nodes;
+    var start_nodes;
+    var finish_nodes;
+    var nodes;
+    submit.on('click', function() {
+        var driver_id = $('.driver_id').val();
+        var date = $('.date').val();
 
-            $.post('/api/query', {
-                driver_id: driver_id,
-                date: date
-            }, function(res) {
-                var response = JSON.parse(res);
-                pick_route = response.pick_route;
-                charge_route = response.charge_route;
-                $.post('/api/map', {
-    	city: 'beijing'
-    }, function(data) {
-    	console.log(data);
-    	echarts.registerMap('beijing', data);
-    	// 基于准备好的dom，初始化echarts实例
-        var myChart = echarts.init(document.getElementById('main'));
-        // 指定图表的配置项和数据
-        var option = {
-            title: {
-                text: ''
-            },
-            tooltip : {
-                trigger: 'item'
-            },
-            legend: {
-                orient: 'vertical',
-                top: 'bottom',
-                left: 'right',
-                data:['接驾路径', '计费路径'],
-                textStyle: {
+        $.post('/api/query', {
+            driver_id: driver_id,
+            date: date
+        }, function(res) {
+            var response = JSON.parse(res);
+            receive_nodes = response.receive_nodes;
+            start_nodes = response.start_nodes;
+            finish_nodes = response.finish_nodes;
+            nodes = response.nodes;
+            $.post('/api/map', {
+                city: 'beijing'
+            }, function(data) {
+                echarts.registerMap('beijing', data);
+                var convertTimeNode = function (data) {
+                    var res = [];
+                    for (var key in data) {
+                        data[key]['data'].forEach(function(item, i) {
+                            var geoCoord = item.coord;
+                            if (geoCoord) {
+                                res.push({
+                                    name: data[key]['name'],
+                                    value: geoCoord.concat(item.time)
+                                })
+                            }
+                        })
+                    }
+                    return res;
+                };
+                var convertData = function(from_nodes, to_nodes, color) {
+                    var res = [];
+                    for (var i = 0; i < to_nodes.length; i++) {
+                            res.push({
+                                coords: [from_nodes[i].coord, to_nodes[i].coord],
+                            })
+                        }
+                    return res;
+                };
 
-                }
-            },
-//            backgroundColor: '#404a59',
-            geo: {
-                show: true,
-                map: 'beijing',
-//                roam: true,
-                itemStyle: {
-                    normal: {
-                        areaColor: '#EAEAEA',
-                        borderColor: '#404a59'
+                // 基于准备好的dom，初始化echarts实例
+                var myChart = echarts.init(document.getElementById('main'));
+                // 指定图表的配置项和数据
+                var colors = ['#00FFFF', '#C0FF3E','#FF0000'];
+                var series = [];
+                var items = [
+                    ['接驾路径', ['receive_nodes', 'start_nodes']],
+                    ['计费路径', ['start_nodes', 'finish_nodes']],
+                    ['空乘路径', ['finish_nodes', 'receive_nodes']]
+                ];
+                items.forEach(function(item, i) {
+                    var fromNodes = response[item[1][0]].data;
+                    var toNodes = response[item[1][1]].data;
+                    if (i == 2){
+                        toNodes.shift();
+                    }
+                    series.push({
+                       name: item[0],
+                       type: 'lines',
+                       coordinateSystem: 'geo',
+                       symbol: ['none', 'arrow'],
+                       symbolSize: 10,
+                       lineStyle: {
+                          normal: {
+                            color: colors[i],
+                            width: 2,
+                            curveness: 0.2
+                          }
+                       },
+                       data: convertData(fromNodes, toNodes, colors[i])
+                   })
+                });
+                series.push({
+                        name: '节点时间',
+                        type: 'scatter',
+                        coordinateSystem: 'geo',
+                        data: convertTimeNode(response),
+                        label: {
+                            normal: {
+                                show: false
+                            },
+                            emphasis: {
+                                show: false
+                            }
+                        },
+                        itemStyle: {
+                            emphasis: {
+                                borderColor: '#fff',
+                                borderWidth: 1
+                            }
+                        }
+                    });
+
+                var option = {
+                    title: {
+                        text: ''
                     },
-                    emphasis: {
-                        areaColor: '#D9D9D9'
-                    }
-                }
-            },
-            series: [{
-                name: '接驾路径',
-                type: 'lines',
-                coordinateSystem: 'geo',
-                polyline: true,
-                geoIndex: 0,
-                zlevel: 1,
-                data: [
-                    {
-                        coords: pick_route,
-                        lineStyle: {
+                    tooltip : {
+                        trigger: 'item',
+                        formatter: function(params) {
+                            return params.name + ':' +params.value[2];
+                        }
+                    },
+                    legend: {
+                        orient: 'vertical',
+                        top: 'bottom',
+                        left: 'right',
+                        data:['接驾路径', '计费路径', '空乘路径'],
+                        textStyle: {
+                        }
+                    },
+                    geo: {
+                        show: true,
+                        map: 'beijing',
+                        itemStyle: {
                             normal: {
-                                color: '#FF0000',
-                                width: 2,
-                                curveness: 0.9
-
+                                areaColor: '#EAEAEA',
+                                borderColor: '#404a59'
+                            },
+                            emphasis: {
+                                areaColor: '#D9D9D9'
                             }
                         }
-                    }
-                ]
-            },{
-                name: '计费路径',
-                type: 'lines',
-                coordinateSystem: 'geo',
-                polyline: true,
-                geoIndex: 0,
-                zlevel: 2,
-                symbol: ['none', 'arrow'],
-                symbolSize: 10,
-                data: [
-                    {
-                        coords: charge_route,
-                        lineStyle: {
-                            normal: {
-                                color: '#00FFFF',
-                                width: 2,
-                                curveness: 0.9
-                            }
-                        }
-                    }
-                ]
-            }
-            ]
-        };
-        // 使用刚指定的配置项和数据显示图表。
-        myChart.setOption(option);
+                    },
+                    roam: true,
+                    series: series
+                };
 
+            // 使用刚指定的配置项和数据显示图表。
+            myChart.setOption(option);
             });
-
         });
     })
-
-    </script>
+</script>
 </body>
 </html>

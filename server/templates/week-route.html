@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>司机轨迹可视化</title>
+  <!-- 引入 echarts.min.js -->
+  <script src="../static/js/echarts.min.js"></script>
+  <script src="../static/js/beijing.js"></script>
+  <script src="../static/js/bmap.js"></script>
+  <script type="text/javascript" src="http://api.map.baidu.com/api?v=2.0&ak=53oVIOgmSIejwV7EfphPgTynOZbIiVYu"></script>
+  <script src="https://code.jquery.com/jquery-3.2.0.min.js"></script>
+  <style>
+    .input-text {
+      width: 20px;
+      height: 10px;
+    }
+  </style>
+
+</head>
+<body>
+<!-- 为ECharts准备一个具备大小（宽高）的Dom -->
+<div class="header">
+  <h2>司机轨迹可视化</h2>
+  司机ID <input type="text" class="driver_id" name="driver_id"><br>
+  查询一天轨迹   <input type="text" class="date" name="date" placeholder="例如:20170315">
+  <input type="submit" class="submit-day" value="缩略地图"><input type="submit" class="submit-day-map" value="百度地图">
+  <input type="text" class="from_time_day" placeholder="例如:08:00:00">-<input type="text" class="to_time_day" placeholder="例如:13:00:00">
+  <input type="submit" class="submit-time-filter-day" value="过滤">
+
+  <br>
+  查询一周轨迹 <input type="text" class="start_date" name="start_date" placeholder="例如:20170315"> －
+   <input type="text" class="end_date" name="end_date" placeholder="例如:20170315">
+  <input type="submit" class="submit-week" value="缩略地图"><input type="submit" class="submit-week-map" value="百度地图">
+  <input type="text" class="from_time_week">-<input type="text" class="to_time_week">
+  <input type="submit" class="submit-time-filter-week" value="过滤">
+  <input type="submit" class="submit-period-intensity-start" value="起点时段密集度">
+  <input type="submit" class="submit-period-intensity-end" value="终点时段密集度">
+  <br>
+  总单数：
+  <input type="text" class="total input-text">
+
+  预约单／实时单：
+  <input type="text" class="appoint_count input-text">／<input type="text" class="realtime_count input-text"><br>
+
+  实时长单／中等单／短单：
+  <input type="text" class="realtime_long input-text">／<input type="text" class="realtime_mid input-text">／<input type="text" class="realtime_short input-text"><br>
+
+  预约长单／中等单／短单：
+  <input type="text" class="appoint_long input-text">／<input type="text" class="appoint_mid input-text">／<input type="text" class="appoint_short input-text"><br>
+</div>
+<div id="main" style="width: 1100px;height: 500px;"></div>
+<script type="text/javascript">
+  var submit_day = $('.submit-day');
+  var submit_week = $('.submit-week');
+  var submit_week_map = $('.submit-week-map');
+  var submit_day_map = $('.submit-day-map');
+  var submit_time_filter_day = $('.submit-time-filter-day');
+  var submit_time_filter_week = $('.submit-time-filter-week');
+  var submit_period_intensity_day = $('.submit-period-intensity-day');
+  var submit_period_intensity_end = $('.submit-period-intensity-end');
+  var submit_period_intensity_start = $('.submit-period-intensity-start');
+  var bmap = {
+            center: [116.46, 39.92],
+            zoom: 10,
+            roam: true,
+            mapStyle: {
+              styleJson: [{
+                'featureType': 'water',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#d1d1d1'
+                }
+              }, {
+                'featureType': 'land',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#f3f3f3'
+                }
+              }, {
+                'featureType': 'railway',
+                'elementType': 'all',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'highway',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#fdfdfd'
+                }
+              }, {
+                'featureType': 'highway',
+                'elementType': 'labels',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'arterial',
+                'elementType': 'geometry',
+                'stylers': {
+                  'color': '#fefefe'
+                }
+              }, {
+                'featureType': 'arterial',
+                'elementType': 'geometry.fill',
+                'stylers': {
+                  'color': '#fefefe'
+                }
+              }, {
+                'featureType': 'poi',
+                'elementType': 'all',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'green',
+                'elementType': 'all',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'subway',
+                'elementType': 'all',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'manmade',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#d1d1d1'
+                }
+              }, {
+                'featureType': 'local',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#d1d1d1'
+                }
+              }, {
+                'featureType': 'arterial',
+                'elementType': 'labels',
+                'stylers': {
+                  'visibility': 'off'
+                }
+              }, {
+                'featureType': 'boundary',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#fefefe'
+                }
+              }, {
+                'featureType': 'building',
+                'elementType': 'all',
+                'stylers': {
+                  'color': '#d1d1d1'
+                }
+              }, {
+                'featureType': 'label',
+                'elementType': 'labels.text.fill',
+                'stylers': {
+                  'color': '#999999'
+                }
+              }]
+            }};
+  submit_period_intensity_day.on('click', function () {
+    var driver_id = $('.driver_id').val();
+    var date = $('.date');
+    $.post('/api/period-intensity-day', {
+      driver_id: driver_id,
+      date: date
+    }, function (res) {
+      var response = JSON.parse(res);
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var convertNode = function (data) {
+        var item_colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+        var types = ['receive_nodes', 'start_nodes', 'finish_nodes'];
+        var res = [];
+        types.forEach(function (type, i) {
+          data[types[i]]['data'].forEach(function(item, k) {
+            var geoCoord = item.coord;
+            if (geoCoord) {
+              res.push({
+                value: geoCoord.concat(item.time),
+                itemStyle: {
+                  normal: {
+                    color: item_colors[i]
+                  },
+                  emphasis: {
+                    show: true
+                  }
+                }
+              })
+            }
+          })
+        });
+        return res;
+      };
+      var convertLines = function (from_nodes, to_nodes, color) {
+        var res = [];
+        for (var i = 0;  i < to_nodes.length; i++) {
+          res.push({
+            coords: [from_nodes[i].coord, to_nodes[i].coord]
+          })
+        }
+        return res;
+      };
+      var myChart = echarts.init(document.getElementById('main'));
+      var series = [];
+      var items = [
+        ['早高峰', 'morning'],
+        ['晚高峰', 'evening'],
+        ['平峰期', 'flat']
+      ];
+      var lines = [
+         ['receive_nodes', 'start_nodes'],
+         ['start_nodes', 'finish_nodes'],
+         ['finish_nodes', 'receive_nodes']
+      ];
+      var symbols = ['circle', 'rect', 'triangle'];
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      items.forEach(function (item, i) {
+        var fromNodes = response[item[1][lines[i][0]]].data;
+        var toNodes = response[item[1][lines[i]][0]].data;
+        series.push({
+          type: 'lines',
+          coordinateSystem: 'geo',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertLines(fromNodes, toNodes, colors[i])
+        });
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertNode(response[item[1]]),
+          symbol: symbols[i],
+          itemStyle: {
+            normal: {
+//              color: colors[i]
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['早高峰', '晚高峰', '平峰期'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    })
+  });
+
+  submit_period_intensity_start.on('click', function() {
+    var driver_id = $('.driver_id').val();
+    var start_date = $('.start_date').val();
+    var end_date = $('.end_date').val();
+    $.post('/api/period-intensity-start', {
+      driver_id: driver_id,
+      start_date: start_date,
+      end_date: end_date
+    }, function (res) {
+      var response = JSON.parse(res);
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var myChart = echarts.init(document.getElementById('main'));
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      var series = [];
+      var items = [
+        ['早高峰', 'morning'],
+        ['晚高峰', 'evening'],
+        ['平峰期', 'flat']
+      ];
+      var convertNode = function (data) {
+        var res = [];
+        data['start_nodes']['data'].forEach(function (item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      items.forEach(function(item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertNode(response[item[1]]),
+          itemStyle: {
+            normal: {
+              color: colors[i]
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['早高峰', '晚高峰', '平峰期'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    })
+  });
+
+  submit_period_intensity_end.on('click', function() {
+    var driver_id = $('.driver_id').val();
+    var start_date = $('.start_date').val();
+    var end_date = $('.end_date').val();
+    $.post('/api/period-intensity-end', {
+      driver_id: driver_id,
+      start_date: start_date,
+      end_date: end_date
+    }, function (res) {
+      var response = JSON.parse(res);
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var myChart = echarts.init(document.getElementById('main'));
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      var series = [];
+      var items = [
+        ['早高峰', 'morning'],
+        ['晚高峰', 'evening'],
+        ['平峰期', 'flat']
+      ];
+      var convertNode = function (data) {
+        var res = [];
+        data['end_nodes']['data'].forEach(function (item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      items.forEach(function(item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertNode(response[item[1]]),
+          itemStyle: {
+            normal: {
+              color: colors[i]
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['早高峰', '晚高峰', '平峰期'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    })
+  });
+
+//  submit_period_intensity_week.on('click', function() {
+//    var driver_id = $('.driver_id').val();
+//    var start_date = $('.start_date').val();
+//    var end_date = $('.end_date').val();
+//    $.post('/api/period-intensity-week', {
+//      driver_id: driver_id,
+//      start_date: start_date,
+//      end_date: end_date
+//    }, function (res) {
+//      var response = JSON.parse(res);
+//      var convertNode = function (data) {
+//        var item_colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+//        var symbols = ['circle', 'triangle', 'rect'];
+//        var types = ['receive_nodes', 'start_nodes', 'finish_nodes'];
+//        var res = [];
+//        types.forEach(function (type, i) {
+//          data[types[i]]['data'].forEach(function(item, k) {
+//            var geoCoord = item.coord;
+//            if (geoCoord) {
+//              res.push({
+//                value: geoCoord.concat(item.time),
+//                symbol: symbols[i]
+//              })
+//            }
+//          })
+//        });
+//        return res;
+//      };
+//      var convertLines = function (fromNodes, toNodes, color) {
+//        var res = [];
+//        for (var i = 0;  i < toNodes.length; i++) {
+//          res.push({
+//            coords: [fromNodes[i].coord, toNodes[i].coord],
+//            lineStyle: {
+//              normal: {
+//                color: color,
+//                width: 2,
+//                curveness: 0.2
+//              }
+//            }
+//          })
+//        }
+//        return res;
+//      };
+//      var myChart = echarts.init(document.getElementById('main'));
+//      var series = [];
+//      var items = [
+//        ['早高峰', 'morning'],
+//        ['晚高峰', 'evening'],
+//        ['平峰期', 'flat']
+//      ];
+//      var symbols = ['circle', 'rect', 'triangle'];
+//      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+//      var lineTypes = [
+//          ['接驾路径', ['receive_nodes', 'start_nodes']],
+//          ['计费路径', ['start_nodes', 'finish_nodes']],
+//          ['空乘路径', ['finish_nodes', 'receive_nodes']]
+//      ];
+//      items.forEach(function (item, i) {
+//        series.push({
+//          name: item[0],
+//          type: 'scatter',
+//          coordinateSystem: 'geo',
+//          data: convertNode(response[item[1]]),
+////          symbol: symbols[i],
+//          itemStyle: {
+//            normal: {
+//              color: colors[i]
+//            },
+//            emphasis: {
+//              borderColor: '#fff',
+//              borderWidth: 1
+//            }
+//          }
+//        });
+//      });
+////      lineTypes.forEach(function (item, i) {
+////        var fromNodes = response[items[i][1]][lineTypes[i][1][0]]['data'];
+////        var toNodes = response[items[i][1]][lineTypes[i][1][1]]['data'];
+////        var color;
+////        if (i == 2) {
+////          toNodes.shift();
+////        }
+////        if (items[i][1] == 'morning') {
+////          color = colors[0]
+////        } else if (items[i][1] == 'evening') {
+////          color = colors[1]
+////        } else {
+////          color = colors[2]
+////        }
+////        series.push({
+////          name: lineTypes[i][0],
+////          type: 'lines',
+////          coordinateSystem: 'geo',
+////          symbol: ['none', 'arrow'],
+////          symbolSize: 10,
+////          data: convertLines(fromNodes, toNodes, color)
+////        })
+////      });
+//      var option = {
+//        title: {
+//          text: ''
+//        },
+//        tooltip : {
+//          trigger: 'item',
+//          formatter: function(params) {
+//            return params.value[2];
+//          }
+//        },
+//        legend: {
+//          orient: 'vertical',
+//          top: 'bottom',
+//          left: 'right',
+//          data:['早高峰', '晚高峰', '平峰期', '接驾路径', '计费路径', '空乘路径'],
+//          textStyle: {
+//          }
+//        },
+//        geo: {
+//          show: true,
+//          map: '北京',
+//          itemStyle: {
+//            normal: {
+//              areaColor: '#EAEAEA',
+//              borderColor: '#404a59'
+//            },
+//            emphasis: {
+//              areaColor: '#D9D9D9'
+//            }
+//          }
+//        },
+//        roam: true,
+//        series: series
+//      };
+//      // 使用刚指定的配置项和数据显示图表。
+//      myChart.setOption(option);
+//    })
+//  });
+
+  submit_time_filter_week.on('click', function () {
+    var driver_id =  $('.driver_id').val();
+    var start_date = $('.start_date').val();
+    var end_date = $('.end_date').val();
+    var from_time = $('.from_time_week').val();
+    var to_time = $('.to_time_week').val();
+    $.post('/api/time-filter-week', {
+      driver_id: driver_id,
+      start_date: start_date,
+      end_date: end_date,
+      from_time: from_time,
+      to_time: to_time
+    }, function (res) {
+      var response = JSON.parse(res);
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var convertRealTimeNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertAppointmentNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var series = [];
+      var items = [
+        ['接单点', 'receive_nodes'],
+        ['起始点', 'start_nodes'],
+        ['目的点', 'finish_nodes']
+      ];
+      items.forEach(function (item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertRealTimeNode(response['realtime'][item[1]]),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+            normal: {
+              color: colors[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var colors_a = ['#FF8000', '#FFD306'];
+      var items_a = [['预约单起点', 'start_nodes'], ['预约单终点', 'finish_nodes']];
+      items_a.forEach(function(item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertAppointmentNode(response['appointment'][item[1]]),
+          itemStyle: {
+            normal: {
+              color: colors_a[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['接单点', '起始点', '目的点', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    })
+  });
+
+  submit_time_filter_day.on('click', function () {
+    var driver_id = $('.driver_id').val();
+    var date = $('.date').val();
+    var from_time = $('.from_time_day').val();
+    var to_time = $('.to_time_day').val();
+    $.post('/api/time-filter-day', {
+      driver_id: driver_id,
+      date: date,
+      from_time: from_time,
+      to_time: to_time
+    }, function(res) {
+      var response = JSON.parse(res);
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var convertTimeNode = function (data, index) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertData = function(from_nodes, to_nodes, color) {
+        var res = [];
+        for (var i = 0; i < to_nodes.length; i++) {
+          res.push({
+            coords: [from_nodes[i].coord, to_nodes[i].coord]
+          })
+        }
+        return res;
+      };
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var series = [];
+      var items = [
+        ['接驾路径', ['receive_nodes', 'start_nodes'], '接单点'],
+        ['计费路径', ['start_nodes', 'finish_nodes'], '起始点'],
+        ['空乘路径', ['finish_nodes', 'receive_nodes'], '目的点']
+      ];
+      items.forEach(function(item, i) {
+        var fromNodes = response['realtime'][item[1][0]].data;
+        var toNodes = response['realtime'][item[1][1]].data;
+        if (i == 2){
+          toNodes.shift();
+        }
+        series.push({
+          name: item[0],
+          type: 'lines',
+          coordinateSystem: 'geo',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertData(fromNodes, toNodes, colors[i])
+        });
+
+        series.push({
+          name: item[2],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertTimeNode(response['realtime'][item[1][0]], i),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+                normal: {
+                  color: colors[i]
+                },
+                emphasis: {
+                  borderColor: '#fff',
+                  borderWidth: 1
+                }
+              }
+        })
+      });
+
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+//            return params.name + ':' +params.value[2];
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:[
+            '接驾路径', '计费路径', '空乘路径', '接单点', '起始点', '目的点',
+            '预约单计费路径', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+
+    })
+  });
+
+  submit_week_map.on('click', function () {
+    var driver_id = $('.driver_id').val();
+    var start_date = $('.start_date').val();
+    var end_date = $('.end_date').val();
+
+    $.post('/api/query-week', {
+      driver_id: driver_id,
+      start_date: start_date,
+      end_date: end_date
+    }, function(res) {
+      var response = JSON.parse(res);
+      $('.total').val(response['total']);
+      $('.realtime_long').val(response['realtime_long']);
+      $('.realtime_mid').val(response['realtime_mid']);
+      $('.realtime_short').val(response['realtime_short']);
+      $('.appoint_long').val(response['appoint_long']);
+      $('.appoint_mid').val(response['appoint_mid']);
+      $('.appoint_short').val(response['appoint_short']);
+      $('.realtime_count').val(response['realtime_count']);
+      $('.appoint_count').val(response['appoint_count']);
+
+      var convertRealTimeNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertAppointmentNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      var series = [];
+      var items = [
+        ['接单点', 'receive_nodes'],
+        ['起始点', 'start_nodes'],
+        ['目的点', 'finish_nodes']
+      ];
+      items.forEach(function (item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'bmap',
+          data: convertRealTimeNode(response['realtime'][item[1]]),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+            normal: {
+              color: colors[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var colors_a = ['#FF8000', '#FFD306'];
+      var items_a = [['预约单起点', 'start_nodes'], ['预约单终点', 'finish_nodes']];
+      items_a.forEach(function(item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'bmap',
+          data: convertAppointmentNode(response['appointment'][item[1]]),
+          itemStyle: {
+            normal: {
+              color: colors_a[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var option = {
+        bmap: bmap,
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['接单点', '起始点', '目的点', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    });
+  });
+
+  submit_week.on('click', function() {
+    var driver_id = $('.driver_id').val();
+    var start_date = $('.start_date').val();
+    var end_date = $('.end_date').val();
+
+    $.post('/api/query-week', {
+      driver_id: driver_id,
+      start_date: start_date,
+      end_date: end_date
+    }, function(res) {
+      var response = JSON.parse(res);
+      $('.total').val(response['total']);
+      $('.realtime_long').val(response['realtime_long']);
+      $('.realtime_mid').val(response['realtime_mid']);
+      $('.realtime_short').val(response['realtime_short']);
+      $('.appoint_long').val(response['appoint_long']);
+      $('.appoint_mid').val(response['appoint_mid']);
+      $('.appoint_short').val(response['appoint_short']);
+      $('.realtime_count').val(response['realtime_count']);
+      $('.appoint_count').val(response['appoint_count']);
+      var convertRealTimeNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertAppointmentNode = function (data) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      var series = [];
+      var items = [
+        ['接单点', 'receive_nodes'],
+        ['起始点', 'start_nodes'],
+        ['目的点', 'finish_nodes']
+      ];
+      items.forEach(function (item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertRealTimeNode(response['realtime'][item[1]]),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+            normal: {
+              color: colors[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var colors_a = ['#FF8000', '#FFD306'];
+      var items_a = [['预约单起点', 'start_nodes'], ['预约单终点', 'finish_nodes']];
+      items_a.forEach(function(item, i) {
+        series.push({
+          name: item[0],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertAppointmentNode(response['appointment'][item[1]]),
+          itemStyle: {
+            normal: {
+              color: colors_a[i]
+//              borderColor: '#404a59'
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:['接单点', '起始点', '目的点', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    });
+  });
+
+  submit_day_map.on('click', function() {
+    var driver_id = $('.driver_id').val();
+    var date = $('.date').val();
+    $.post('/api/query-day', {
+      driver_id: driver_id,
+      date: date
+    }, function(res) {
+      var response = JSON.parse(res);
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var convertTimeNode = function (data, index) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertData = function(from_nodes, to_nodes, color) {
+        var res = [];
+        var lineStyle;
+        for (var i = 0; i < to_nodes.length; i++) {
+          if (from_nodes[i].realdes) {
+            lineStyle = {
+              normal: {
+                width: 5,
+                type: 'dotted'
+              }
+            }
+          }
+          res.push({
+            coords: [from_nodes[i].coord, to_nodes[i].coord],
+            lineStyle: lineStyle
+          })
+        }
+        return res;
+      };
+
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var series = [];
+      var items = [
+        ['接驾路径', ['receive_nodes', 'start_nodes'], '接单点'],
+        ['计费路径', ['start_nodes', 'finish_nodes'], '起始点'],
+        ['空乘路径', ['finish_nodes', 'receive_nodes'], '目的点']
+      ];
+      items.forEach(function(item, i) {
+        var fromNodes = response['realtime'][item[1][0]].data;
+        var toNodes = response['realtime'][item[1][1]].data;
+        if (i == 2){
+          toNodes.shift();
+        }
+        series.push({
+          name: item[0],
+          type: 'lines',
+          coordinateSystem: 'bmap',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertData(fromNodes, toNodes, colors[i])
+        });
+
+        series.push({
+          name: item[2],
+          type: 'scatter',
+          coordinateSystem: 'bmap',
+          data: convertTimeNode(response['realtime'][item[1][0]], i),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+                normal: {
+                  color: colors[i]
+                },
+                emphasis: {
+                  borderColor: '#fff',
+                  borderWidth: 1
+                }
+              }
+        })
+      });
+
+      var items_a = [
+        ['预约单计费路径', ['start_nodes', 'finish_nodes']]
+      ];
+      var colors_a = ['#FF8000', '#FFD306'];
+      items_a.forEach(function(item, i) {
+        var fromNodes = response['appointment'][item[1][0]].data;
+        var toNodes = response['appointment'][item[1][1]].data;
+        if (i == 2){
+          toNodes.shift();
+        }
+        series.push({
+          name: item[0],
+          type: 'lines',
+          coordinateSystem: 'bmap',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors_a[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertData(fromNodes, toNodes, colors_a[i])
+        });
+      });
+      var items_a_node = [
+        ['start_nodes', '预约单起点'],
+        ['finish_nodes', '预约单终点']
+      ];
+      items_a_node.forEach(function(item, i) {
+        series.push({
+          name: item[1],
+          type: 'scatter',
+          coordinateSystem: 'bmap',
+          data: convertTimeNode(response['appointment'][item[0]], i),
+          itemStyle: {
+            normal: {
+              color: colors_a[i]
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var option = {
+        bmap: bmap,
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+//            return params.name + ':' +params.value[2];
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:[
+            '接驾路径', '计费路径', '空乘路径', '接单点', '起始点', '目的点',
+            '预约单计费路径', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+
+    });
+  });
+
+  submit_day.on('click', function() {
+    var driver_id = $('.driver_id').val();
+    var date = $('.date').val();
+    $.post('/api/query-day', {
+      driver_id: driver_id,
+      date: date
+    }, function(res) {
+      var response = JSON.parse(res);
+      var colors = ['#00BFFF', '#55AA00', '#FF2D2D'];
+      $('.total').val('');
+      $('.realtime_long').val('');
+      $('.realtime_mid').val('');
+      $('.realtime_short').val('');
+      $('.appoint_long').val('');
+      $('.appoint_mid').val('');
+      $('.appoint_short').val('');
+      $('.realtime_count').val('');
+      $('.appoint_count').val('');
+      var convertTimeNode = function (data, index) {
+        var res = [];
+        data['data'].forEach(function(item, i) {
+          var geoCoord = item.coord;
+          if (geoCoord) {
+            res.push({
+              name: item.id,
+              value: geoCoord.concat(item.time)
+            })
+          }
+        });
+        return res;
+      };
+      var convertData = function(from_nodes, to_nodes, color) {
+        var res = [];
+        var lineStyle;
+        for (var i = 0; i < to_nodes.length; i++) {
+          if (from_nodes[i].realdes) {
+            lineStyle = {
+              normal: {
+                width: 5,
+                type: 'dotted'
+              }
+            }
+          }
+          res.push({
+            coords: [from_nodes[i].coord, to_nodes[i].coord],
+            lineStyle: lineStyle
+          })
+        }
+        return res;
+      };
+      // 基于准备好的dom，初始化echarts实例
+      var myChart = echarts.init(document.getElementById('main'));
+      // 指定图表的配置项和数据
+      var series = [];
+      var items = [
+        ['接驾路径', ['receive_nodes', 'start_nodes'], '接单点'],
+        ['计费路径', ['start_nodes', 'finish_nodes'], '起始点'],
+        ['空乘路径', ['finish_nodes', 'receive_nodes'], '目的点']
+      ];
+      items.forEach(function(item, i) {
+        var fromNodes = response['realtime'][item[1][0]].data;
+        var toNodes = response['realtime'][item[1][1]].data;
+        if (i == 2){
+          toNodes.shift();
+        }
+        series.push({
+          name: item[0],
+          type: 'lines',
+          coordinateSystem: 'geo',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertData(fromNodes, toNodes, colors[i])
+        });
+
+        series.push({
+          name: item[2],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertTimeNode(response['realtime'][item[1][0]], i),
+          label: {
+            normal: {
+              show: true,
+              formatter: '{b}',
+              position: 'right',
+              textStyle: {
+                color: '#5B5B5B',
+                fontWeight: 'bold'
+              }
+            },
+            emphasis: {
+              show: true
+            }
+          },
+          itemStyle: {
+                normal: {
+                  color: colors[i]
+                },
+                emphasis: {
+                  borderColor: '#fff',
+                  borderWidth: 1
+                }
+              }
+        })
+      });
+
+      var items_a = [
+        ['预约单计费路径', ['start_nodes', 'finish_nodes']]
+      ];
+      var colors_a = ['#FF8000', '#FFD306'];
+      items_a.forEach(function(item, i) {
+        var fromNodes = response['appointment'][item[1][0]].data;
+        var toNodes = response['appointment'][item[1][1]].data;
+        if (i == 2){
+          toNodes.shift();
+        }
+        series.push({
+          name: item[0],
+          type: 'lines',
+          coordinateSystem: 'geo',
+          symbol: ['none', 'arrow'],
+          symbolSize: 10,
+          lineStyle: {
+            normal: {
+              color: colors_a[i],
+              width: 2,
+              curveness: 0.2
+            }
+          },
+          data: convertData(fromNodes, toNodes, colors_a[i])
+        });
+      });
+      var items_a_node = [
+        ['start_nodes', '预约单起点'],
+        ['finish_nodes', '预约单终点']
+      ];
+      items_a_node.forEach(function(item, i) {
+        series.push({
+          name: item[1],
+          type: 'scatter',
+          coordinateSystem: 'geo',
+          data: convertTimeNode(response['appointment'][item[0]], i),
+          itemStyle: {
+            normal: {
+              color: colors_a[i]
+            },
+            emphasis: {
+              borderColor: '#fff',
+              borderWidth: 1
+            }
+          }
+        })
+      });
+
+      var option = {
+        title: {
+          text: ''
+        },
+        tooltip : {
+          trigger: 'item',
+          formatter: function(params) {
+//            return params.name + ':' +params.value[2];
+            return params.value[2];
+          }
+        },
+        legend: {
+          orient: 'vertical',
+          top: 'bottom',
+          left: 'right',
+          data:[
+            '接驾路径', '计费路径', '空乘路径', '接单点', '起始点', '目的点',
+            '预约单计费路径', '预约单起点', '预约单终点'],
+          textStyle: {
+          }
+        },
+        geo: {
+          show: true,
+          map: '北京',
+          itemStyle: {
+            normal: {
+              areaColor: '#EAEAEA',
+              borderColor: '#404a59'
+            },
+            emphasis: {
+              areaColor: '#D9D9D9'
+            }
+          }
+        },
+        roam: true,
+        series: series
+      };
+      // 使用刚指定的配置项和数据显示图表。
+      myChart.setOption(option);
+    });
+  })
+
+</script>
+</body>
+</html>
